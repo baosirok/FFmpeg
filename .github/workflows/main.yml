@@ -1,0 +1,60 @@
+name: Build FFmpeg
+
+on:
+  push:
+    branches:
+      - release/8.1
+  pull_request:
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    name: Build FFmpeg (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install -y yasm nasm
+      
+      - name: Install Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install yasm nasm
+      
+      - name: Configure
+        run: |
+          ./configure --enable-gpl --enable-shared
+      
+      - name: Build
+        run: |
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-${{ matrix.os }}
+          path: |
+            ffmpeg
+            ffprobe
+            ffplay
+            libavcodec/*.so*
+            libavformat/*.so*
+            libavutil/*.so*
+            libavfilter/*.so*
+            libswscale/*.so*
+            libswresample/*.so*
+            libavcodec/*.dylib
+            libavformat/*.dylib
+            libavutil/*.dylib
+            libavfilter/*.dylib
+            libswscale/*.dylib
+            libswresample/*.dylib
