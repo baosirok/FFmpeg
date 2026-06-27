@@ -1,29 +1,60 @@
 name: Build FFmpeg
 
 on:
-  workflow_dispatch:  # 手动触发
+  push:
+    branches:
+      - release/8.1
+  pull_request:
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    name: Build FFmpeg (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       
-      - name: Install Dependencies
-        run: sudo apt update && sudo apt install -y yasm nasm
+      - name: Install Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install -y yasm nasm
+      
+      - name: Install Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install yasm nasm
+      
+      - name: Configure
+        run: |
+          ./configure --enable-gpl --enable-shared
       
       - name: Build
         run: |
-          ./configure --enable-gpl --enable-shared
-          make -j$(nproc)
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
       
-      - name: Package
-        run: |
-          mkdir -p release
-          cp ffmpeg ffprobe libavcodec/*.so* libavformat/*.so* libavutil/*.so* release/
-      
-      - name: Upload
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-linux-x64
-          path: release/
+          name: ffmpeg-${{ matrix.os }}
+          path: |
+            ffmpeg
+            ffprobe
+            ffplay
+            libavcodec/*.so*
+            libavformat/*.so*
+            libavutil/*.so*
+            libavfilter/*.so*
+            libswscale/*.so*
+            libswresample/*.so*
+            libavcodec/*.dylib
+            libavformat/*.dylib
+            libavutil/*.dylib
+            libavfilter/*.dylib
+            libswscale/*.dylib
+            libswresample/*.dylib
